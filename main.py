@@ -1,28 +1,25 @@
 from flask import Flask, request, jsonify
-import openai
 import os
-
-my_secret = os.environ['ChatGptApiKey']
+from openai import OpenAI
 
 app = Flask(__name__)
-
-openai.api_key = my_secret
-
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
     req = request.get_json()
-    user_query = req["queryResult"]["queryText"]
+    user_query = req.get("queryResult", {}).get("queryText", "")
 
-    response = openai.ChatCompletion.create(model="gpt-3.5-turbo",
-                                            messages=[{
-                                                "role": "user",
-                                                "content": user_query
-                                            }])
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "user", "content": user_query}
+            ]
+        )
+        reply = response.choices[0].message.content.strip()
+    except Exception as e:
+        print("Error:", str(e))
+        return jsonify({"fulfillmentText": "Oops, something went wrong!"})
 
-    chat_response = response["choices"][0]["message"]["content"]
-
-    return jsonify({"fulfillmentText": chat_response})
-
-
-app.run(host="0.0.0.0", port=5001)
+    return jsonify({"fulfillmentText": reply})
